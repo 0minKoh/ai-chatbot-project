@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory/
+
+# Django
+*.log
+*.pot
+*.mo
+*.js.map
+*.css.map
+db.sqlite3 # SQLite는 로컬 개발용, 배포 DB는 추적하지 않음
+/media/
+/static/
+
+# OS X
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.idea/
+.vscode/
+*.swp
