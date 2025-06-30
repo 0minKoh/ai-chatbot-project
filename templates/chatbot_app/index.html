@@ -1,0 +1,21 @@
+{% extends 'chatbot_app/base.html' %} {% load static %} {% block title %}메인
+페이지 - 수파자 챗봇{% endblock %} {% block extra_head %}
+<style>
+  /* 메인 페이지 내용을 중앙에 배치하고 높이 조절 */
+  .main-content {
+    min-height: 80vh; /* 뷰포트 높이의 80% */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="main-content">
+  <h1>수파자 AI 상담 챗봇 프로젝트</h1>
+  <p class="lead">안녕하세요! 이곳은 챗봇 프로젝트의 메인 페이지입니다.</p>
+  <p>오른쪽 하단의 챗봇 버튼을 클릭하여 AI 상담을 시작해보세요.</p>
+</div>
+
+{% include 'chatbot_app/chatbot_ui.html' %} {% endblock %}

@@ -1,0 +1,133 @@
+{% load static %}
+<style>
+  /* Sticky Button */
+  .chatbot-button {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background-color: #007bff; /* Primary blue */
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    z-index: 1000; /* Ensure it's on top */
+  }
+
+  /* Chat UI Container */
+  .chatbot-container {
+    position: fixed;
+    bottom: 100px; /* 버튼 위쪽에 위치 */
+    right: 30px;
+    width: 380px; /* 적당한 챗봇 창 너비 */
+    height: 500px; /* 적당한 챗봇 창 높이 */
+    background-color: #f8f9fa; /* Light background */
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 999;
+    transform: translateY(100%); /* Initially hidden below screen */
+    opacity: 0;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out; /* Animation */
+  }
+
+  .chatbot-container.active {
+    transform: translateY(0); /* Slide up */
+    opacity: 1;
+  }
+
+  .chatbot-header {
+    background-color: #007bff;
+    color: white;
+    padding: 15px;
+    border-top-left-radius: 9px;
+    border-top-right-radius: 9px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+  }
+
+  .chatbot-header .close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0 5px;
+  }
+
+  .chatbot-body {
+    flex-grow: 1;
+    padding: 15px;
+    overflow-y: auto; /* Scrollable chat area */
+    background-color: white;
+  }
+
+  .chatbot-footer {
+    padding: 15px;
+    background-color: #e9ecef;
+    border-bottom-left-radius: 9px;
+    border-bottom-right-radius: 9px;
+    display: flex;
+  }
+
+  .chatbot-footer input {
+    flex-grow: 1;
+    border-radius: 20px;
+    padding: 8px 15px;
+    border: 1px solid #ced4da;
+  }
+
+  .chatbot-footer button {
+    margin-left: 10px;
+    border-radius: 20px;
+    padding: 8px 15px;
+    background-color: #28a745; /* Success green */
+    color: white;
+    border: none;
+  }
+</style>
+
+<div class="chatbot-button" id="chatbotToggleBtn">💬</div>
+
+<div class="chatbot-container" id="chatbotContainer">
+  <div class="chatbot-header">
+    <span>수파자 AI 상담</span>
+    <button class="close-btn" id="chatbotCloseBtn">&times;</button>
+  </div>
+  <div class="chatbot-body">
+    <p>안녕하세요! 수파자 챗봇입니다. 무엇을 도와드릴까요?</p>
+    <p>이곳은 챗 UI 테스트 영역입니다.</p>
+  </div>
+  <div class="chatbot-footer">
+    <input type="text" placeholder="문의 사항을 입력하세요..." disabled />
+    <button disabled>전송</button>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toggleBtn = document.getElementById("chatbotToggleBtn");
+    const closeBtn = document.getElementById("chatbotCloseBtn");
+    const chatbotContainer = document.getElementById("chatbotContainer");
+
+    // 챗봇 버튼 클릭 시 챗 UI 토글
+    toggleBtn.addEventListener("click", function () {
+      chatbotContainer.classList.toggle("active");
+    });
+
+    // 챗봇 닫기 버튼 클릭 시 챗 UI 숨기기
+    closeBtn.addEventListener("click", function () {
+      chatbotContainer.classList.remove("active");
+    });
+  });
+</script>
