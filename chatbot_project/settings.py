@@ -76,8 +76,12 @@ WSGI_APPLICATION = "chatbot_project.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        'NAME': 'supaja_rag_db',                            # 생성한 DB 이름
+        'USER': 'chatbot_app_user',                                 # 생성한 사용자 이름
+        'PASSWORD': 'supaja_pw',                         # 사용자 비밀번호
+        'HOST': 'localhost',                              # DB 서버 주소 (로컬인 경우 localhost)
+        'PORT': '',
     }
 }
 
