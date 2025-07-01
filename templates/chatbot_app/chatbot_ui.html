@@ -167,8 +167,10 @@
     const chatInput = document.getElementById("chatInput");
     const sendMessageBtn = document.getElementById("sendMessageBtn");
 
-    let selectedService = null; // 선택된 서비스를 저장할 변수
-    const chatApiUrl = "{% url 'chatbot_app:chat_api' %}"; // Django API URL 가져오기
+    let selectedService = null;
+    const chatApiUrl = "{% url 'chatbot_app:chat_api' %}";
+
+    let currentBotMessageDiv = null; // 현재 봇 메시지가 추가될 div
 
     // 챗봇 초기 상태 설정
     function initializeChatbot() {
@@ -176,21 +178,19 @@
                 <div class="chat-message bot">안녕하세요! 수파자 AI 상담 챗봇입니다. 무엇을 도와드릴까요?</div>
                 <div class="chat-message bot">문의하실 서비스를 선택해주세요:</div>
                 <div class="service-options" id="serviceOptions">
-                    <button class="btn btn-outline-primary service-select-btn" data-service="과외" data-displayname="수파자 과외">수파자 과외</button>
-                    <button class="btn btn-outline-primary service-select-btn" data-service="낭독" data-displayname="수파자 낭독">수파자 낭독</button>
-                    <button class="btn btn-outline-primary service-select-btn" data-service="소방" data-displayname="소방 히어로 멤버십">소방 히어로 멤버십</button>
+                    <button class="btn btn-outline-primary service-select-btn" data-service="과외">수파자 과외</button>
+                    <button class="btn btn-outline-primary service-select-btn" data-service="낭독">수파자 낭독</button>
+                    <button class="btn btn-outline-primary service-select-btn" data-service="소방">소방 히어로 멤버십</button>
                 </div>
             `;
-      // 새로 생성된 serviceOptions에 이벤트 리스너를 다시 붙여야 함
       attachServiceOptionListeners();
       chatInput.setAttribute("disabled", "true");
       sendMessageBtn.setAttribute("disabled", "true");
-      selectedService = null; // 서비스 선택 초기화
-      selectedServiceDisplayName = null; // 선택된 서비스 표시 이름 초기화
-      chatbotBody.scrollTop = chatbotBody.scrollHeight; // 스크롤 최하단으로
+      selectedService = null;
+      chatbotBody.scrollTop = chatbotBody.scrollHeight;
+      currentBotMessageDiv = null; // 초기화 시 현재 봇 메시지 div도 초기화
     }
 
-    // 서비스 선택 버튼에 이벤트 리스너를 다시 붙이는 함수
     function attachServiceOptionListeners() {
       const currentServiceOptionsContainer =
         chatbotBody.querySelector("#serviceOptions");
@@ -200,17 +200,17 @@
           function (event) {
             if (event.target.classList.contains("service-select-btn")) {
               selectedService = event.target.dataset.service;
-              selectedServiceDisplayName = event.target.dataset.displayname;
+              const displayServiceName = event.target.textContent;
               displayMessage(
-                `"${selectedServiceDisplayName}"를 선택하셨습니다.`,
+                `"${displayServiceName}"를 선택하셨습니다.`,
                 "user"
               );
               displayMessage(
-                `${selectedServiceDisplayName}에 대해 문의 사항을 입력해주세요.`,
+                `${displayServiceName}에 대해 문의 사항을 입력해주세요.`,
                 "bot"
               );
 
-              currentServiceOptionsContainer.style.display = "none"; // 서비스 선택 버튼 숨기기
+              currentServiceOptionsContainer.style.display = "none";
               chatInput.removeAttribute("disabled");
               sendMessageBtn.removeAttribute("disabled");
               chatInput.focus();
@@ -220,19 +220,31 @@
       }
     }
 
-    // 메시지를 챗봇 창에 표시하는 함수
     function displayMessage(text, sender) {
       const messageDiv = document.createElement("div");
       messageDiv.classList.add("chat-message", sender);
-      messageDiv.textContent = text;
+      messageDiv.innerHTML = text; // HTML을 허용할 수 있도록 textContent 대신 innerHTML 사용 (로딩 스피너 등을 위해)
       chatbotBody.appendChild(messageDiv);
       chatbotBody.scrollTop = chatbotBody.scrollHeight;
+      return messageDiv; // 생성된 메시지 div 반환 (스트리밍 시 사용)
     }
 
-    // 챗봇 API 호출 함수
-    async function fetchChatResponse(question, category) {
-      displayMessage("답변 생성 중...", "bot"); // 로딩 메시지
+    // 챗봇 API 호출 함수 (SSE 스트리밍)
+    async function fetchChatResponseStream(question, category) {
+      // "답변 생성 중..." 메시지를 먼저 표시 (스트리밍 시작 전)
+      currentBotMessageDiv = displayMessage(
+        `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 답변 생성 중...`,
+        "bot"
+      );
+      let receivedFullResponse = ""; // 스트리밍으로 받은 전체 응답을 저장할 변수
+
       try {
+        // EventSource는 GET 요청만 지원하므로, POST 요청을 위해서는 fetch를 사용하고
+        // response.body.getReader()를 통해 ReadableStream을 처리해야 합니다.
+        // 또는, 백엔드에서 POST 요청을 받은 후 별도의 SSE 엔드포인트로 리다이렉트하는 방식을 사용할 수도 있습니다.
+
+        // 여기서는 Django chat_api가 POST를 받고 StreamingHttpResponse로 SSE를 보내므로
+        // fetch API를 사용하고 ReadableStreamReader를 직접 읽어 처리합니다.
         const response = await fetch(chatApiUrl, {
           method: "POST",
           headers: {
@@ -241,25 +253,83 @@
           body: JSON.stringify({ question: question, category: category }),
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-          displayMessage(data.answer, "bot"); // LLM 답변 표시
-        } else {
-          displayMessage(
-            `오류: ${data.error || "알 수 없는 오류 발생"}`,
-            "bot"
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            `HTTP 오류: ${response.status} - ${
+              errorData.error || "알 수 없는 오류"
+            }`
           );
         }
+
+        // 스트림 리더를 가져옴
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+
+        let buffer = "";
+        const SSE_DELIMITER = "\nSSE_DELIMITER\n";
+
+        // 로딩 메시지 제거하고 실제 답변을 받을 div 준비
+        if (currentBotMessageDiv) {
+          currentBotMessageDiv.innerHTML = ""; // 기존 로딩 메시지 초기화
+        } else {
+          currentBotMessageDiv = displayMessage("", "bot"); // div가 없으면 새로 생성
+        }
+
+        // 스트림에서 데이터 읽기
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true }); // 스트림 디코딩
+
+          let delimiterIndex = buffer.indexOf(SSE_DELIMITER);
+          while (delimiterIndex !== -1) {
+            const eventString = buffer.substring(0, delimiterIndex);
+            buffer = buffer.substring(delimiterIndex + SSE_DELIMITER.length); // 처리된 부분 제거
+
+            if (eventString.startsWith("data: ")) {
+              const jsonStr = eventString.substring(6);
+              try {
+                const content = JSON.parse(jsonStr);
+                receivedFullResponse += content;
+                if (currentBotMessageDiv) {
+                  currentBotMessageDiv.innerHTML = receivedFullResponse.replace(
+                    /\n/g,
+                    "<br>"
+                  );
+                  chatbotBody.scrollTop = chatbotBody.scrollHeight;
+                }
+              } catch (e) {
+                console.warn(
+                  "JSON 파싱 오류: 불완전한 data 라인. 다음 청크와 재시도.",
+                  e,
+                  eventString
+                );
+                // 오류가 발생한 부분은 다시 버퍼에 추가하여 다음 청크와 합쳐질 수 있도록 합니다.
+                buffer = eventString + SSE_DELIMITER + buffer;
+                break; // 현재 메시지 처리를 중단하고 다음 read()를 기다림
+              }
+            } else if (eventString.startsWith("event: end")) {
+              break;
+            }
+            delimiterIndex = buffer.indexOf(SSE_DELIMITER);
+          }
+        }
       } catch (error) {
-        console.error("챗봇 API 호출 오류:", error);
+        console.error("챗봇 스트리밍 API 호출 오류:", error);
         displayMessage(
           "죄송합니다. 챗봇 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
           "bot"
         );
       } finally {
-        // 로딩 메시지 제거 또는 업데이트 로직 (필요 시)
-        // 현재는 새 메시지가 오면 스크롤이 내려가면서 자연스럽게 가려짐.
+        // 스트리밍이 완료되거나 오류 발생 시 스피너 제거 (이미 textContent로 덮어쓰여져 있겠지만 안전 장치)
+        if (
+          currentBotMessageDiv &&
+          currentBotMessageDiv.querySelector(".spinner-border")
+        ) {
+          currentBotMessageDiv.querySelector(".spinner-border").remove();
+        }
       }
     }
 
@@ -267,28 +337,27 @@
     function sendMessage() {
       const messageText = chatInput.value.trim();
       if (messageText && selectedService) {
-        displayMessage(messageText, "user"); // 사용자 메시지 표시
-        chatInput.value = ""; // 입력 필드 초기화
+        displayMessage(messageText, "user");
+        chatInput.value = "";
 
-        // Django API로 요청 보내기
-        fetchChatResponse(messageText, selectedService);
+        // 스트리밍 API 호출
+        fetchChatResponseStream(messageText, selectedService);
       } else if (!selectedService) {
         displayMessage("먼저 서비스 카테고리를 선택해주세요.", "bot");
       }
     }
 
-    // 이벤트 리스너 설정
+    // 이벤트 리스너 설정 (기존과 동일)
     toggleBtn.addEventListener("click", function () {
       chatbotContainer.classList.toggle("active");
       if (chatbotContainer.classList.contains("active")) {
-        initializeChatbot(); // 챗봇 열 때마다 초기화
+        initializeChatbot();
       }
     });
 
     closeBtn.addEventListener("click", function () {
       chatbotContainer.classList.remove("active");
-      // 닫을 때 상태 초기화는 toggleBtn 클릭 시 초기화되므로 중복될 수 있습니다.
-      // 필요에 따라 이 부분에서 추가 초기화 로직을 넣을 수 있습니다.
+      // initializeChatbot(); // 닫을 때 초기화는 toggleBtn 클릭 시 처리
     });
 
     sendMessageBtn.addEventListener("click", sendMessage);
@@ -298,7 +367,6 @@
       }
     });
 
-    // 초기 로드 시 챗봇 초기화 (페이지 로드 시 챗봇이 바로 보이지 않아도 내부적으로 초기 상태 준비)
     initializeChatbot();
   });
 </script>
