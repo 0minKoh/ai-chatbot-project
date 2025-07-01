@@ -134,38 +134,7 @@
     <span>수파자 AI 상담</span>
     <button class="close-btn" id="chatbotCloseBtn">&times;</button>
   </div>
-  <div class="chatbot-body" id="chatbotBody">
-    <div class="chat-message bot">
-      안녕하세요! 수파자 AI 상담 챗봇입니다. 무엇을 도와드릴까요?
-    </div>
-    <div class="chat-message bot">문의하실 서비스를 선택해주세요:</div>
-    <div class="service-options" id="serviceOptions">
-      <button
-        class="btn btn-outline-primary service-select-btn"
-        data-service="수파자 과외"
-      >
-        수파자 과외
-      </button>
-      <button
-        class="btn btn-outline-primary service-select-btn"
-        data-service="수파자 낭독"
-      >
-        수파자 낭독
-      </button>
-      <button
-        class="btn btn-outline-primary service-select-btn"
-        data-service="소방 히어로 멤버십"
-      >
-        소방 히어로 멤버십
-      </button>
-      <button
-        class="btn btn-outline-primary service-select-btn"
-        data-service="기타 문의"
-      >
-        기타 문의
-      </button>
-    </div>
-  </div>
+  <div class="chatbot-body" id="chatbotBody"></div>
   <div class="chatbot-footer">
     <div style="flex-grow: 1">
       <input
@@ -195,110 +164,30 @@
     const closeBtn = document.getElementById("chatbotCloseBtn");
     const chatbotContainer = document.getElementById("chatbotContainer");
     const chatbotBody = document.getElementById("chatbotBody");
-    const serviceOptions = document.getElementById("serviceOptions");
     const chatInput = document.getElementById("chatInput");
     const sendMessageBtn = document.getElementById("sendMessageBtn");
 
     let selectedService = null; // 선택된 서비스를 저장할 변수
+    const chatApiUrl = "{% url 'chatbot_app:chat_api' %}"; // Django API URL 가져오기
 
-    // 챗봇 버튼 클릭 시 챗 UI 토글
-    toggleBtn.addEventListener("click", function () {
-      chatbotContainer.classList.toggle("active");
-      if (chatbotContainer.classList.contains("active")) {
-        chatbotBody.scrollTop = chatbotBody.scrollHeight; // 챗봇 열릴 때 스크롤 최하단으로
-      }
-    });
-
-    // 챗봇 닫기 버튼 클릭 시 챗 UI 숨기기
-    closeBtn.addEventListener("click", function () {
-      chatbotContainer.classList.remove("active");
-      // 닫을 때 상태 초기화 (옵션)
-      resetChatbotState();
-    });
-
-    // 서비스 선택 버튼 클릭 이벤트
-    serviceOptions.addEventListener("click", function (event) {
-      if (event.target.classList.contains("service-select-btn")) {
-        selectedService = event.target.dataset.service;
-        displayMessage(`"${selectedService}"를 선택하셨습니다.`, "user"); // 사용자가 선택한 것처럼 표시
-        displayMessage(
-          `${selectedService}에 대해 문의 사항을 입력해주세요.`,
-          "bot"
-        );
-
-        // 서비스 선택 버튼 숨기고 입력창 활성화
-        serviceOptions.style.display = "none";
-        chatInput.removeAttribute("disabled");
-        sendMessageBtn.removeAttribute("disabled");
-        chatInput.focus(); // 입력창에 포커스
-
-        // (나중에) 선택된 서비스에 따라 백엔드로 데이터를 전송하는 로직 추가
-      }
-    });
-
-    // 메시지 전송 (현재는 UI 테스트용)
-    sendMessageBtn.addEventListener("click", function () {
-      sendMessage();
-    });
-
-    chatInput.addEventListener("keypress", function (event) {
-      if (event.key === "Enter") {
-        sendMessage();
-      }
-    });
-
-    function sendMessage() {
-      const messageText = chatInput.value.trim();
-      if (messageText) {
-        displayMessage(messageText, "user");
-        chatInput.value = ""; // 입력 필드 초기화
-        // (나중에) 이 메시지를 백엔드로 전송하는 로직 추가
-        // 현재는 AI 답변 로직이 없으므로, 간단한 응답 표시
-        displayMessage(
-          "죄송합니다. 아직 답변 기능을 개발 중입니다. (테스트 메시지)",
-          "bot"
-        );
-      }
-    }
-
-    // 메시지를 챗봇 창에 표시하는 함수
-    function displayMessage(text, sender) {
-      const messageDiv = document.createElement("div");
-      messageDiv.classList.add("chat-message", sender);
-      messageDiv.textContent = text;
-      chatbotBody.appendChild(messageDiv);
-      chatbotBody.scrollTop = chatbotBody.scrollHeight; // 스크롤을 최하단으로 이동
-    }
-
-    // 챗봇 상태 초기화 함수 (닫을 때 또는 새로 시작할 때)
-    function resetChatbotState() {
-      selectedService = null;
+    // 챗봇 초기 상태 설정
+    function initializeChatbot() {
       chatbotBody.innerHTML = `
                 <div class="chat-message bot">안녕하세요! 수파자 AI 상담 챗봇입니다. 무엇을 도와드릴까요?</div>
                 <div class="chat-message bot">문의하실 서비스를 선택해주세요:</div>
                 <div class="service-options" id="serviceOptions">
-                    <button class="btn btn-outline-primary service-select-btn" data-service="수파자 과외">수파자 과외</button>
-                    <button class="btn btn-outline-primary service-select-btn" data-service="수파자 낭독">수파자 낭독</button>
-                    <button class="btn btn-outline-primary service-select-btn" data-service="소방 히어로 멤버십">소방 히어로 멤버십</button>
-                    <button class="btn btn-outline-primary service-select-btn" data-service="기타 문의">기타 문의</button>
+                    <button class="btn btn-outline-primary service-select-btn" data-service="과외" data-displayname="수파자 과외">수파자 과외</button>
+                    <button class="btn btn-outline-primary service-select-btn" data-service="낭독" data-displayname="수파자 낭독">수파자 낭독</button>
+                    <button class="btn btn-outline-primary service-select-btn" data-service="소방" data-displayname="소방 히어로 멤버십">소방 히어로 멤버십</button>
                 </div>
             `;
+      // 새로 생성된 serviceOptions에 이벤트 리스너를 다시 붙여야 함
+      attachServiceOptionListeners();
       chatInput.setAttribute("disabled", "true");
       sendMessageBtn.setAttribute("disabled", "true");
-
-      // 서비스 선택 버튼 컨테이너를 다시 활성화 (새로 생성했으므로 다시 DOM에서 찾아야 함)
-      const newServiceOptions = chatbotBody.querySelector(".service-options");
-      if (newServiceOptions) {
-        newServiceOptions.style.display = "flex"; // flex로 설정하여 버튼이 보이게 함
-        // resetChatbotState가 호출된 후 새로 생성된 버튼에 이벤트 리스너를 다시 연결해야 하지만,
-        // 현재는 DOMContentLoaded에서 한 번만 붙이므로, 실제 로직에서는 동적 요소에 대한 이벤트 위임을 고려해야 합니다.
-        // 여기서는 간단한 UI 테스트이므로, 새롭게 생성된 serviceOptions에 대한 이벤트는 다시 붙이지 않습니다.
-        // 실제 개발 시에는 이벤트 위임을 사용하거나, resetChatbotState가 DOM 구조를 다시 그리지 않고 내용을 업데이트하는 방식으로 변경해야 합니다.
-      }
-      // 현재 코드에서는 resetChatbotState가 호출될 때 serviceOptions가 새로 생성되므로
-      // serviceOptions에 대한 이벤트 리스너는 resetChatbotState 외부에서 (DOMContentLoaded처럼) 한 번만 붙여서는 안됩니다.
-      // 임시로, resetChatbotState에서 이벤트 리스너를 다시 붙이는 코드를 포함합니다. (실제 프로젝트에서는 이벤트 위임 권장)
-      attachServiceOptionListeners();
+      selectedService = null; // 서비스 선택 초기화
+      selectedServiceDisplayName = null; // 선택된 서비스 표시 이름 초기화
+      chatbotBody.scrollTop = chatbotBody.scrollHeight; // 스크롤 최하단으로
     }
 
     // 서비스 선택 버튼에 이벤트 리스너를 다시 붙이는 함수
@@ -311,13 +200,17 @@
           function (event) {
             if (event.target.classList.contains("service-select-btn")) {
               selectedService = event.target.dataset.service;
-              displayMessage(`"${selectedService}"를 선택하셨습니다.`, "user");
+              selectedServiceDisplayName = event.target.dataset.displayname;
               displayMessage(
-                `${selectedService}에 대해 문의 사항을 입력해주세요.`,
+                `"${selectedServiceDisplayName}"를 선택하셨습니다.`,
+                "user"
+              );
+              displayMessage(
+                `${selectedServiceDisplayName}에 대해 문의 사항을 입력해주세요.`,
                 "bot"
               );
 
-              currentServiceOptionsContainer.style.display = "none";
+              currentServiceOptionsContainer.style.display = "none"; // 서비스 선택 버튼 숨기기
               chatInput.removeAttribute("disabled");
               sendMessageBtn.removeAttribute("disabled");
               chatInput.focus();
@@ -326,7 +219,86 @@
         );
       }
     }
-    // 초기 로드 시 서비스 옵션 리스너 붙이기
-    attachServiceOptionListeners();
+
+    // 메시지를 챗봇 창에 표시하는 함수
+    function displayMessage(text, sender) {
+      const messageDiv = document.createElement("div");
+      messageDiv.classList.add("chat-message", sender);
+      messageDiv.textContent = text;
+      chatbotBody.appendChild(messageDiv);
+      chatbotBody.scrollTop = chatbotBody.scrollHeight;
+    }
+
+    // 챗봇 API 호출 함수
+    async function fetchChatResponse(question, category) {
+      displayMessage("답변 생성 중...", "bot"); // 로딩 메시지
+      try {
+        const response = await fetch(chatApiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ question: question, category: category }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          displayMessage(data.answer, "bot"); // LLM 답변 표시
+        } else {
+          displayMessage(
+            `오류: ${data.error || "알 수 없는 오류 발생"}`,
+            "bot"
+          );
+        }
+      } catch (error) {
+        console.error("챗봇 API 호출 오류:", error);
+        displayMessage(
+          "죄송합니다. 챗봇 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+          "bot"
+        );
+      } finally {
+        // 로딩 메시지 제거 또는 업데이트 로직 (필요 시)
+        // 현재는 새 메시지가 오면 스크롤이 내려가면서 자연스럽게 가려짐.
+      }
+    }
+
+    // 메시지 전송 로직
+    function sendMessage() {
+      const messageText = chatInput.value.trim();
+      if (messageText && selectedService) {
+        displayMessage(messageText, "user"); // 사용자 메시지 표시
+        chatInput.value = ""; // 입력 필드 초기화
+
+        // Django API로 요청 보내기
+        fetchChatResponse(messageText, selectedService);
+      } else if (!selectedService) {
+        displayMessage("먼저 서비스 카테고리를 선택해주세요.", "bot");
+      }
+    }
+
+    // 이벤트 리스너 설정
+    toggleBtn.addEventListener("click", function () {
+      chatbotContainer.classList.toggle("active");
+      if (chatbotContainer.classList.contains("active")) {
+        initializeChatbot(); // 챗봇 열 때마다 초기화
+      }
+    });
+
+    closeBtn.addEventListener("click", function () {
+      chatbotContainer.classList.remove("active");
+      // 닫을 때 상태 초기화는 toggleBtn 클릭 시 초기화되므로 중복될 수 있습니다.
+      // 필요에 따라 이 부분에서 추가 초기화 로직을 넣을 수 있습니다.
+    });
+
+    sendMessageBtn.addEventListener("click", sendMessage);
+    chatInput.addEventListener("keypress", function (event) {
+      if (event.key === "Enter") {
+        sendMessage();
+      }
+    });
+
+    // 초기 로드 시 챗봇 초기화 (페이지 로드 시 챗봇이 바로 보이지 않아도 내부적으로 초기 상태 준비)
+    initializeChatbot();
   });
 </script>
