@@ -114,34 +114,56 @@ def chat_api(request):
             print(f"사용자 질문: {user_question}, 카테고리: {service_category}")
 
             # 1. RAG 수행: 선택된 카테고리에서 관련 FAQ 검색
-            relevant_faqs = search_faq_in_vector_db(user_question, service_category, top_k=1)
+            relevant_faqs = search_faq_in_vector_db(user_question, service_category, top_k=3)
 
-            # 2. LLM 프롬프트 구성 (컨텍스트 포함)
-            context = ""
+            # 2. LLM 프롬프트 및 Few Shot 구성 (강력한 컨텍스트 및 지시 포함)
+            rag_context_text = ""
+            few_shot_examples_for_ollama = []
             if relevant_faqs:
-                context += "다음은 사용자 질문과 관련된 FAQ 내용입니다:\\n"
+                rag_context_text += "다음은 사용자의 질문과 관련된 FAQ 내용입니다:\\n"
                 for i, faq_data in enumerate(relevant_faqs):
+                    # 각 FAQ 객체에서 질문과 답변 추출
                     faq = faq_data['faq_object']
-                    context += f"--- FAQ {i+1} ---\\n"
-                    context += f"질문: {faq.question}\\n"
-                    context += f"답변: {faq.answer}\\n"
-                context += "--------------------\\n"
-                context += "위 FAQ 내용 중 적절한 항목을 골라, '답변' 내용을 참고하여 사용자 질문에 답변해주세요. 만약 관련 정보가 없다면 '해당 서비스에 대한 문의 답변을 찾을 수 없습니다.'라고 답변하세요.\\n\\n"
+
+                    # FAQ 질문과 답변을 컨텍스트에 추가
+                    rag_context_text += f"--- FAQ {i+1} ---\\n"
+                    rag_context_text += f"질문: {faq.question}\\n"
+                    rag_context_text += f"답변: {faq.answer}\\n"
+
+                    # Few Shot 예시로 추가
+                    few_shot_examples_for_ollama.append(
+                        {"role": "user", "content": faq.question},
+                    )
+                    few_shot_examples_for_ollama.append(
+                        {"role": "assistant", "content": faq.answer},
+                    )
+                rag_context_text += "--------------------\\n"
             else:
-                context += "관련 FAQ를 찾을 수 없습니다. 일반적인 지식으로 답변하거나, 관련 정보가 없다고 알려주세요.\\n\\n"
+                # 관련 FAQ가 없을 때 명확히 "잘 모르겠어요"로 답변하도록 지시
+                rag_context_text += "현재 제공된 FAQ 내용에는 사용자 질문과 관련된 정보가 없습니다. 따라서 **'잘 모르겠어요. 더 자세한 정보가 필요하시면 수파자 고객센터로 문의해주세요. 🙇‍♀️'** 라고만 답변해야 합니다. 다른 내용은 추가하지 마세요.\\n\\n"
 
-            context += "아래 질문에 대해 답하되, 줄바꿈('\\n') 및 기호을 적절히 활용하여 구조화된 답변을 제시하세요.\\n"
-            llm_prompt = f"{context}사용자 질문: {user_question}"
 
-            print(f"LLM으로 보낼 프롬프트:\\n{llm_prompt[:500]}...")
+            # 최종 LLM 프롬프트: 컨텍스트와 실제 사용자 질문 결합
+            llm_request_payload = {
+                "prompt": user_question, # 실제 사용자 질문 (clean)
+                "rag_context": rag_context_text, # RAG로 검색된 컨텍스트 텍스트 (옵션)
+                "few_shot_examples": few_shot_examples_for_ollama # Few-Shot 예시 리스트
+            }
+
+            print("RAG 컨텍스트 텍스트:")
+            print(rag_context_text[:500])  # 처음 500자만 출력 (디
+
+            print(f"LLM으로 보낼 데이터 (프롬프트: '{llm_request_payload['prompt'][:100]}', "
+                  f"Few-Shot 예시 수: {len(few_shot_examples_for_ollama) // 2}, "
+                  f"RAG 컨텍스트 길이: {len(rag_context_text)})...\n")
 
             # 3. LLM 서버 호출 및 스트리밍 응답 프록시
-            def generate_response_stream(prompt):
+            def generate_response_stream(payload):
                 try:
                     # FastAPI LLM 서버에 스트리밍 요청
                     with requests.post(
                         LLM_SERVER_URL,
-                        json={"prompt": prompt},
+                        json=payload,
                         stream=True, # 스트리밍 응답을 받기 위해 True
                         timeout=120 # LLM 응답 대기 시간
                     ) as response:
@@ -164,7 +186,7 @@ def chat_api(request):
                     yield "event: end\\ndata: \\n\\n"
 
             # StreamingHttpResponse로 제너레이터 반환
-            return StreamingHttpResponse(generate_response_stream(llm_prompt), content_type="text/event-stream")
+            return StreamingHttpResponse(generate_response_stream(llm_request_payload), content_type="text/event-stream")
 
         except json.JSONDecodeError:
             return JsonResponse({'error': '잘못된 JSON 형식입니다.'}, status=400)
